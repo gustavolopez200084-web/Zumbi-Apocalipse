@@ -99,10 +99,15 @@ function create() {
     this.physics.add.existing(player);
     player.body.setCollideWorldBounds(true);
 
-    // 4. Groups
+    // 4. Create proper textures for objects without external assets
+    const bulletGraphics = this.make.graphics({ x: 0, y: 0, add: false });
+    bulletGraphics.fillStyle(0xffff00);
+    bulletGraphics.fillCircle(5, 5, 5);
+    bulletGraphics.generateTexture('bullet_tex', 10, 10);
+
     bullets = this.physics.add.group({
-        defaultKey: 'bullet', // Not using textures, but group needs to know it's physics-based
-        maxSize: 50
+        defaultKey: 'bullet_tex',
+        maxSize: 100
     });
 
     zombies = this.physics.add.group();
@@ -203,24 +208,36 @@ function spawnZombie() {
 
 function fireBullet() {
     const pointer = this.input.activePointer;
+    // Usamos pointer.worldX e worldY para garantir precisão no mapa
     const angle = Phaser.Math.Angle.Between(player.x, player.y, pointer.worldX, pointer.worldY);
 
-    // Criar o projétil
-    const bullet = this.add.circle(player.x, player.y, 5, 0xffff00);
-    this.physics.add.existing(bullet);
+    // Pegar uma bala do grupo (pool) usando a textura gerada
+    let bullet = bullets.get(player.x, player.y, 'bullet_tex');
 
-    // Aplicar velocidade baseada na rotação (Correção Gemini)
-    this.physics.velocityFromRotation(angle, gameState.bulletSpeed, bullet.body.velocity);
+    if (bullet) {
+        bullet.setActive(true);
+        bullet.setVisible(true);
+        bullet.setPosition(player.x, player.y);
 
-    // Destruição automática para evitar memory leak
-    this.time.addEvent({
-        delay: 2000,
-        callback: () => {
-            if (bullet) bullet.destroy();
-        }
-    });
+        // Ativar a física explicitamente para este objeto reciclado
+        this.physics.add.existing(bullet);
 
-    bullets.add(bullet);
+        // Aplicar a velocidade diretamente (Correção definitiva)
+        bullet.body.setVelocity(
+            Math.cos(angle) * gameState.bulletSpeed,
+            Math.sin(angle) * gameState.bulletSpeed
+        );
+
+        // Timer para autodesativar/destruir a bala
+        this.time.addEvent({
+            delay: 2000,
+            callback: () => {
+                if (bullet.active) {
+                    bullet.destroy(); // Usamos destroy() para simplificar a limpeza
+                }
+            }
+        });
+    }
 }
 
 function damageZombie(bullet, zombie) {

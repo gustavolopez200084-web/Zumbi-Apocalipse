@@ -34,16 +34,17 @@ const gameState = {
     playerMaxHp: 100,
     playerSpeed: 200,
     fireRate: 400, // ms between shots
-    bulletDamage: 1,
+    bulletDamage: 50,
+    baseBulletDamage: 50,
     bulletSpeed: 600,
     lastFired: 0,
     isPaused: false,
     zombieSpeed: 60,
-    zombieMaxHP: 2,
+    zombieMaxHP: 100,
     spawnRate: 2000,
     upgrades: {
         fireRate: 1,
-        damage: 1,
+        damage: 0, // Inicia em 0
         fortify: 1
     }
 };
@@ -51,6 +52,7 @@ const gameState = {
 // UI Elements (updated to match new index.html)
 const ui = {
     gold: document.getElementById('credit-count'),
+    dmg: document.getElementById('damage-count'),
     playerHpBar: document.getElementById('player-hp-bar'),
     baseHpBar: document.getElementById('base-hp-bar'),
     wave: document.getElementById('wave-number'),
@@ -140,12 +142,35 @@ function create() {
         loop: true
     });
 
+    // 9. Zombie HP Bar Graphics
+    this.hpGraphics = this.add.graphics();
+
     // UI Setup
     setupShopListeners();
 }
 
 function update(time, delta) {
     if (gameState.isPaused) return;
+
+    // Clear and redraw HP bars
+    this.hpGraphics.clear();
+    zombies.children.iterate((zombie) => {
+        if (zombie && zombie.active && zombie.hp < zombie.maxHp) {
+            const barWidth = 20;
+            const barHeight = 4;
+            const px = zombie.x - barWidth / 2;
+            const py = zombie.y - 20;
+
+            // Background
+            this.hpGraphics.fillStyle(0x000000, 0.5);
+            this.hpGraphics.fillRect(px, py, barWidth, barHeight);
+
+            // Health
+            const percent = zombie.hp / zombie.maxHp;
+            this.hpGraphics.fillStyle(0x00ff88, 1);
+            this.hpGraphics.fillRect(px, py, barWidth * percent, barHeight);
+        }
+    });
 
     // Player Movement
     player.body.setVelocity(0);
@@ -200,7 +225,11 @@ function spawnZombie() {
     const zombieSize = 12;
     const zombie = this.add.circle(x, y, zombieSize, 0xff0055);
     this.physics.add.existing(zombie);
-    zombie.hp = gameState.zombieMaxHP;
+
+    // Nova lógica de vida: zombieHP = 100 * (1.2 ^ (currentWave - 1))
+    zombie.maxHp = Math.floor(100 * Math.pow(1.2, gameState.wave - 1));
+    zombie.hp = zombie.maxHp;
+
     zombie.lastDamageTime = 0; // For continuous damage tracking
     zombie.setStrokeStyle(2, 0xffffff);
     zombies.add(zombie);
@@ -242,9 +271,16 @@ function fireBullet() {
 
 function damageZombie(bullet, zombie) {
     bullet.destroy();
-    zombie.hp -= gameState.bulletDamage;
 
-    // Visual feedback
+    // Sistema de Critical Hit: 10% chance
+    const isCrit = Math.random() < 0.10;
+    let damage = gameState.bulletDamage;
+    if (isCrit) {
+        damage *= 2;
+        showCritEffect(this, zombie.x, zombie.y);
+    }
+
+    zombie.hp -= damage;
     flashRed(this, zombie);
 
     if (zombie.hp <= 0) {
@@ -252,6 +288,19 @@ function damageZombie(bullet, zombie) {
         updateUI();
         zombie.destroy();
     }
+}
+
+function showCritEffect(scene, x, y) {
+    const text = scene.add.text(x, y - 20, 'CRÍTICO!', {
+        fontSize: '16px', fontWeight: 'bold', fill: '#ffff00', stroke: '#000', strokeThickness: 2
+    }).setOrigin(0.5);
+    scene.tweens.add({
+        targets: text,
+        y: y - 50,
+        alpha: 0,
+        duration: 800,
+        onComplete: () => text.destroy()
+    });
 }
 
 function flashRed(scene, target) {
@@ -309,7 +358,7 @@ function zombieDamagePlayer(playerObj, zombie) {
 function scaleDifficulty() {
     gameState.wave++;
     gameState.zombieSpeed += 5;
-    gameState.zombieMaxHP += 10;
+    // O HP dos zumbis agora é calculado dinamicamente no spawnZombie usando a Wave
     gameState.spawnRate = Math.max(200, gameState.spawnRate - 100);
     this.spawnTimer.delay = gameState.spawnRate;
     updateUI();
@@ -317,6 +366,7 @@ function scaleDifficulty() {
 
 function updateUI() {
     ui.gold.innerText = gameState.gold;
+    ui.dmg.innerText = gameState.bulletDamage;
     ui.wave.innerText = gameState.wave;
 
     const baseHpPercent = (gameState.baseHp / gameState.baseMaxHp) * 100;
@@ -375,14 +425,15 @@ function setupShopListeners() {
     };
 
     document.getElementById('upgrade-damage').onclick = () => {
-        const cost = 150 * gameState.upgrades.damage;
+        const cost = 150 * (gameState.upgrades.damage + 1);
         if (gameState.gold >= cost) {
             gameState.gold -= cost;
             gameState.upgrades.damage++;
-            gameState.bulletDamage += 1;
-            gameState.bulletSpeed += 50; // Extra speed!
-            ui.lvls.damage.innerText = 'LVL ' + gameState.upgrades.damage;
-            ui.costs.damage.innerText = 150 * gameState.upgrades.damage;
+            // Cálculo: currentDamage = 50 + (upgradeLevel * 25)
+            gameState.bulletDamage = gameState.baseBulletDamage + (gameState.upgrades.damage * 25);
+            gameState.bulletSpeed += 30; // Pequeno bônus de velocidade
+            ui.lvls.damage.innerText = 'LVL ' + (gameState.upgrades.damage + 1);
+            ui.costs.damage.innerText = 150 * (gameState.upgrades.damage + 2);
             updateUI();
         }
     };

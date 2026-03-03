@@ -25,39 +25,45 @@ const config = {
 
 // Global State
 const gameState = {
-    credits: 0,
+    gold: 0,
     wave: 1,
     difficultyScale: 1,
     baseHp: 100,
     baseMaxHp: 100,
+    playerHp: 100,
+    playerMaxHp: 100,
     playerSpeed: 200,
     fireRate: 400, // ms between shots
-    damage: 1,
+    bulletDamage: 1,
     lastFired: 0,
     isPaused: false,
+    zombieSpeed: 60,
+    zombieMaxHP: 2,
+    spawnRate: 2000,
     upgrades: {
         fireRate: 1,
         damage: 1,
-        speed: 1
+        fortify: 1
     }
 };
 
-// UI Elements
+// UI Elements (updated to match new index.html)
 const ui = {
-    credits: document.getElementById('credit-count'),
+    gold: document.getElementById('credit-count'),
+    playerHpBar: document.getElementById('player-hp-bar'),
     baseHpBar: document.getElementById('base-hp-bar'),
     wave: document.getElementById('wave-number'),
     shop: document.getElementById('shop-menu'),
     costs: {
         fireRate: document.getElementById('cost-fire-rate'),
         damage: document.getElementById('cost-damage'),
-        speed: document.getElementById('cost-speed'),
-        repair: document.getElementById('cost-repair')
+        repair: document.getElementById('cost-repair'),
+        fortify: document.getElementById('cost-fortify')
     },
     lvls: {
         fireRate: document.getElementById('lvl-fire-rate'),
         damage: document.getElementById('lvl-damage'),
-        speed: document.getElementById('lvl-speed')
+        fortify: document.getElementById('lvl-fortify')
     }
 };
 
@@ -104,16 +110,17 @@ function create() {
     cursors = this.input.keyboard.createCursorKeys();
     keys = this.input.keyboard.addKeys('W,A,S,D,P');
 
-    // 6. Collisions
+    // 6. Collisions (Continuous damage will be handled in update or separate handlers)
     this.physics.add.collider(player, base);
     this.physics.add.overlap(bullets, zombies, hitZombie, null, this);
-    this.physics.add.overlap(zombies, base, zombieHitBase, null, this);
-    this.physics.add.overlap(player, zombies, zombieHitPlayer, null, this);
+    // Overlap checks for damage logic
+    this.physics.add.overlap(zombies, base, zombieDamageBase, null, this);
+    this.physics.add.overlap(zombies, player, zombieDamagePlayer, null, this);
 
-    // 7. Difficulty Scaling (Every 30s)
+    // 7. Difficulty Scaling (Every 60s)
     lastWaveTime = this.time.now;
     this.time.addEvent({
-        delay: 30000,
+        delay: 60000,
         callback: scaleDifficulty,
         callbackScope: this,
         loop: true
@@ -160,9 +167,9 @@ function update(time, delta) {
 
     // AI Logic (Zombies move towards center/player)
     zombies.children.iterate((zombie) => {
-        if (!zombie) return;
+        if (!zombie || !zombie.active) return;
         const target = (Phaser.Math.Distance.Between(zombie.x, zombie.y, player.x, player.y) < 150) ? player : base;
-        this.physics.moveToObject(zombie, target, 60 * gameState.difficultyScale);
+        this.physics.moveToObject(zombie, target, gameState.zombieSpeed);
     });
 
     // Pause Check
@@ -175,7 +182,7 @@ function update(time, delta) {
 
 function spawnZombie() {
     if (gameState.isPaused) return;
-    
+
     // Pick a side (Top, Bottom, Left, Right)
     const side = Phaser.Math.Between(0, 3);
     let x, y;
@@ -184,10 +191,11 @@ function spawnZombie() {
     else if (side === 2) { x = -50; y = Phaser.Math.Between(0, 600); }
     else { x = 850; y = Phaser.Math.Between(0, 600); }
 
-    const zombieSize = 12 * gameState.difficultyScale;
+    const zombieSize = 12;
     const zombie = this.add.circle(x, y, zombieSize, 0xff0055);
     this.physics.add.existing(zombie);
-    zombie.hp = Math.ceil(2 * gameState.difficultyScale);
+    zombie.hp = gameState.zombieMaxHP;
+    zombie.lastDamageTime = 0; // For continuous damage tracking
     zombie.setStrokeStyle(2, 0xffffff);
     zombies.add(zombie);
 }
@@ -196,11 +204,11 @@ function fireBullet() {
     const angle = Phaser.Math.Angle.Between(player.x, player.y, this.input.x, this.input.y);
     const bullet = this.add.circle(player.x, player.y, 4, 0xffff00);
     this.physics.add.existing(bullet);
-    
+
     // Set bullet velocity
     const speed = 500;
     bullet.body.setVelocity(Math.cos(angle) * speed, Math.sin(angle) * speed);
-    
+
     // Auto destroy
     this.time.addEvent({
         delay: 2000,
@@ -211,71 +219,103 @@ function fireBullet() {
 
 function hitZombie(bullet, zombie) {
     bullet.destroy();
-    zombie.hp -= gameState.damage;
-    
+    zombie.hp -= gameState.bulletDamage;
+
     // Visual feedback
-    this.tweens.add({
-        targets: zombie,
-        alpha: 0.5,
-        duration: 50,
-        yoyo: true
-    });
+    flashRed(this, zombie);
 
     if (zombie.hp <= 0) {
-        gameState.credits += Math.ceil(10 * gameState.difficultyScale);
+        gameState.gold += 20;
         updateUI();
         zombie.destroy();
     }
 }
 
-function zombieHitBase(zombie, base) {
-    zombie.destroy();
-    gameState.baseHp -= 10 * gameState.difficultyScale;
-    updateUI();
-    
-    // Screen Shake
-    this.cameras.main.shake(100, 0.01);
+function flashRed(scene, target) {
+    if (target.isFlashing) return;
+    target.isFlashing = true;
+    const originalFill = target.fillColor;
+    target.fillColor = 0xff3333;
+    scene.tweens.add({
+        targets: target,
+        alpha: 0.5,
+        duration: 100,
+        yoyo: true,
+        onComplete: () => {
+            target.fillColor = originalFill;
+            target.alpha = 1;
+            target.isFlashing = false;
+        }
+    });
+}
 
-    if (gameState.baseHp <= 0) {
-        gameOver.call(this);
+function zombieDamageBase(baseObj, zombie) {
+    // Continuous damage: 10 HP per second
+    // delta time approx 16.6ms, 10/60 = 0.166 per frame?
+    // Better: use a timestamp
+    const now = game.loop.time;
+    if (now > zombie.lastDamageTime + 1000) {
+        gameState.baseHp -= 10;
+        zombie.lastDamageTime = now;
+        flashRed(this, base);
+        this.cameras.main.shake(100, 0.005);
+        updateUI();
+
+        if (gameState.baseHp <= 0) {
+            gameOver.call(this);
+        }
     }
 }
 
-function zombieHitPlayer(player, zombie) {
-    // Player just slows down zombies or takes some invisible damage for pushback
-    const angle = Phaser.Math.Angle.Between(zombie.x, zombie.y, player.x, player.y);
-    player.body.setVelocity(Math.cos(angle) * 500, Math.sin(angle) * 500);
+function zombieDamagePlayer(playerObj, zombie) {
+    const now = game.loop.time;
+    if (now > zombie.lastDamageTime + 1000) {
+        gameState.playerHp -= 10;
+        zombie.lastDamageTime = now;
+        flashRed(this, player);
+        updateUI();
+
+        if (gameState.playerHp <= 0) {
+            gameOver.call(this);
+        }
+    }
 }
+
+// Removed old collision handlers as they are replaced by zombieDamage functions above.
 
 function scaleDifficulty() {
     gameState.wave++;
-    gameState.difficultyScale += 0.2;
-    // Increase spawn rate
-    this.spawnTimer.delay = Math.max(500, 2000 - (gameState.wave * 100));
+    gameState.zombieSpeed += 5;
+    gameState.zombieMaxHP += 10;
+    gameState.spawnRate = Math.max(200, gameState.spawnRate - 100);
+    this.spawnTimer.delay = gameState.spawnRate;
     updateUI();
 }
 
 function updateUI() {
-    ui.credits.innerText = gameState.credits;
+    ui.gold.innerText = gameState.gold;
     ui.wave.innerText = gameState.wave;
-    
-    const hpPercent = (gameState.baseHp / gameState.baseMaxHp) * 100;
-    ui.baseHpBar.style.width = hpPercent + '%';
-    
-    // Visual alerts
-    if (hpPercent < 30) ui.baseHpBar.style.background = '#ff0000';
-    else ui.baseHpBar.style.background = 'linear-gradient(90deg, var(--secondary), #ff4d88)';
+
+    const baseHpPercent = (gameState.baseHp / gameState.baseMaxHp) * 100;
+    ui.baseHpBar.style.width = Math.max(0, baseHpPercent) + '%';
+
+    const playerHpPercent = (gameState.playerHp / gameState.playerMaxHp) * 100;
+    ui.playerHpBar.style.width = Math.max(0, playerHpPercent) + '%';
+
+    // Visual alerts for base
+    if (baseHpPercent < 30) ui.baseHpBar.style.background = '#ff0000';
+    else ui.baseHpBar.style.background = 'linear-gradient(90deg, #33aaff, #00ff88)';
 }
 
 function gameOver() {
     this.physics.pause();
     gameState.isPaused = true;
-    const overText = this.add.text(400, 300, 'GAME OVER', { 
-        fontFamily: 'Orbitron', fontSize: '64px', fill: '#ff0055' 
+    const overText = this.add.text(400, 300, 'GAME OVER', {
+        fontFamily: 'Orbitron', fontSize: '64px', fill: '#ff0055'
     }).setOrigin(0.5);
-    
-    this.add.text(400, 380, 'Clique para Reiniciar', { 
-        fontFamily: 'Orbitron', fontSize: '24px', fill: '#fff' 
+
+    this.add.text(400, 380, 'Clique para Reiniciar', {
+        fontFamily: 'Orbitron', fontSize: '24px', fill: '#fff'
     }).setOrigin(0.5);
 
     this.input.on('pointerdown', () => {
@@ -301,10 +341,10 @@ function setupShopListeners() {
 
     document.getElementById('upgrade-fire-rate').onclick = () => {
         const cost = 100 * gameState.upgrades.fireRate;
-        if (gameState.credits >= cost) {
-            gameState.credits -= cost;
+        if (gameState.gold >= cost) {
+            gameState.gold -= cost;
             gameState.upgrades.fireRate++;
-            gameState.fireRate = Math.max(100, 400 - (gameState.upgrades.fireRate * 30));
+            gameState.fireRate = Math.max(80, 400 - (gameState.upgrades.fireRate * 40));
             ui.lvls.fireRate.innerText = 'LVL ' + gameState.upgrades.fireRate;
             ui.costs.fireRate.innerText = 100 * gameState.upgrades.fireRate;
             updateUI();
@@ -313,33 +353,34 @@ function setupShopListeners() {
 
     document.getElementById('upgrade-damage').onclick = () => {
         const cost = 150 * gameState.upgrades.damage;
-        if (gameState.credits >= cost) {
-            gameState.credits -= cost;
+        if (gameState.gold >= cost) {
+            gameState.gold -= cost;
             gameState.upgrades.damage++;
-            gameState.damage += 0.5;
+            gameState.bulletDamage += 1;
             ui.lvls.damage.innerText = 'LVL ' + gameState.upgrades.damage;
             ui.costs.damage.innerText = 150 * gameState.upgrades.damage;
             updateUI();
         }
     };
 
-    document.getElementById('upgrade-speed').onclick = () => {
-        const cost = 80 * gameState.upgrades.speed;
-        if (gameState.credits >= cost) {
-            gameState.credits -= cost;
-            gameState.upgrades.speed++;
-            gameState.playerSpeed += 20;
-            ui.lvls.speed.innerText = 'LVL ' + gameState.upgrades.speed;
-            ui.costs.speed.innerText = 80 * gameState.upgrades.speed;
+    document.getElementById('fortify-base').onclick = () => {
+        const cost = 300 * gameState.upgrades.fortify;
+        if (gameState.gold >= cost) {
+            gameState.gold -= cost;
+            gameState.upgrades.fortify++;
+            gameState.baseMaxHp += 50;
+            gameState.baseHp += 50; // Increase current too
+            ui.lvls.fortify.innerText = 'LVL ' + gameState.upgrades.fortify;
+            ui.costs.fortify.innerText = 300 * gameState.upgrades.fortify;
             updateUI();
         }
     };
 
     document.getElementById('repair-base').onclick = () => {
-        const cost = 50;
-        if (gameState.credits >= cost && gameState.baseHp < gameState.baseMaxHp) {
-            gameState.credits -= cost;
-            gameState.baseHp = Math.min(gameState.baseMaxHp, gameState.baseHp + 25);
+        const cost = 150;
+        if (gameState.gold >= cost && gameState.baseHp < gameState.baseMaxHp) {
+            gameState.gold -= cost;
+            gameState.baseHp = Math.min(gameState.baseMaxHp, gameState.baseHp + Math.floor(gameState.baseMaxHp * 0.25));
             updateUI();
         }
     };

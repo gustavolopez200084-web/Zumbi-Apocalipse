@@ -1,13 +1,16 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Zombie Defender - Sobreviva ao Apocalipse</title>
-  <meta name="description" content="Um jogo de sobrevivência 2D top-down onde você defende sua base contra hordas de zumbis. Construído com Phaser 3.">
+  <meta name="description"
+    content="Um jogo de sobrevivência 2D top-down onde você defende sua base contra hordas de zumbis. Construído com Phaser 3.">
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
 </head>
+
 <body>
 
   <div id="game-container">
@@ -15,8 +18,15 @@
     <div class="ui-overlay">
       <div class="hud">
         <div class="stats-card">
-          <div class="label" id="credits-label">CRÉDITOS</div>
+          <div class="label" id="credits-label">OURO</div>
           <div class="value" id="credit-count">0</div>
+        </div>
+
+        <div class="stats-card">
+          <div class="label" id="player-life-label">HP JOGADOR</div>
+          <div class="health-bar-container">
+            <div id="player-hp-bar" class="health-bar-fill player-hp"></div>
+          </div>
         </div>
 
         <div class="stats-card">
@@ -24,7 +34,8 @@
           <div class="health-bar-container">
             <div id="base-hp-bar" class="health-bar-fill"></div>
           </div>
-          <div class="label" id="wave-label" style="margin-top: 10px; font-size: 0.7rem;">WAVE: <span id="wave-number">1</span></div>
+          <div class="label" id="wave-label" style="margin-top: 10px; font-size: 0.7rem;">DIFICULDADE: <span
+              id="wave-number">1</span></div>
         </div>
       </div>
     </div>
@@ -32,7 +43,7 @@
     <!-- Upgrade Shop (Hidden by default) -->
     <div id="shop-menu" class="shop-menu">
       <h2 class="shop-title">UPGRADES</h2>
-      
+
       <div id="upgrade-fire-rate" class="shop-item" aria-label="Aumentar cadência de tiro">
         <div class="upgrade-info">
           <span class="upgrade-name">Cadência de Tiro</span>
@@ -49,20 +60,20 @@
         <div class="label" id="lvl-damage">LVL 1</div>
       </div>
 
-      <div id="upgrade-speed" class="shop-item" aria-label="Aumentar velocidade de movimento">
-        <div class="upgrade-info">
-          <span class="upgrade-name">Velocidade</span>
-          <span class="upgrade-cost">Custo: <span id="cost-speed">80</span></span>
-        </div>
-        <div class="label" id="lvl-speed">LVL 1</div>
-      </div>
-
       <div id="repair-base" class="shop-item" aria-label="Reparar base">
         <div class="upgrade-info">
-          <span class="upgrade-name">Reparar Base</span>
-          <span class="upgrade-cost">Custo: <span id="cost-repair">50</span></span>
+          <span class="upgrade-name">Reparar Base (+25%)</span>
+          <span class="upgrade-cost">Custo: <span id="cost-repair">150</span></span>
         </div>
-        <div class="label">+25% HP</div>
+        <div class="label">REPARO</div>
+      </div>
+
+      <div id="fortify-base" class="shop-item" aria-label="Fortalecer base">
+        <div class="upgrade-info">
+          <span class="upgrade-name">Fortalecer Base (+HP Máx)</span>
+          <span class="upgrade-cost">Custo: <span id="cost-fortify">300</span></span>
+        </div>
+        <div class="label" id="lvl-fortify">LVL 1</div>
       </div>
 
       <button id="btn-close-shop" class="btn-close">VOLTAR AO JOGO (P)</button>
@@ -71,4 +82,5 @@
 
   <script src="game.js"></script>
 </body>
+
 </html>

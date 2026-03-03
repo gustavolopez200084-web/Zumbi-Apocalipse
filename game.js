@@ -35,6 +35,7 @@ const gameState = {
     playerSpeed: 200,
     fireRate: 400, // ms between shots
     bulletDamage: 1,
+    bulletSpeed: 600,
     lastFired: 0,
     isPaused: false,
     zombieSpeed: 60,
@@ -100,8 +101,8 @@ function create() {
 
     // 4. Groups
     bullets = this.physics.add.group({
-        classType: Phaser.GameObjects.Arc,
-        runChildUpdate: true
+        defaultKey: 'bullet', // Not using textures, but group needs to know it's physics-based
+        maxSize: 50
     });
 
     zombies = this.physics.add.group();
@@ -110,9 +111,9 @@ function create() {
     cursors = this.input.keyboard.createCursorKeys();
     keys = this.input.keyboard.addKeys('W,A,S,D,P');
 
-    // 6. Collisions (Continuous damage will be handled in update or separate handlers)
+    // 6. Collisions
     this.physics.add.collider(player, base);
-    this.physics.add.overlap(bullets, zombies, hitZombie, null, this);
+    this.physics.add.overlap(bullets, zombies, damageZombie, null, this);
     // Overlap checks for damage logic
     this.physics.add.overlap(zombies, base, zombieDamageBase, null, this);
     this.physics.add.overlap(zombies, player, zombieDamagePlayer, null, this);
@@ -201,23 +202,28 @@ function spawnZombie() {
 }
 
 function fireBullet() {
-    const angle = Phaser.Math.Angle.Between(player.x, player.y, this.input.x, this.input.y);
-    const bullet = this.add.circle(player.x, player.y, 4, 0xffff00);
+    const pointer = this.input.activePointer;
+    const angle = Phaser.Math.Angle.Between(player.x, player.y, pointer.worldX, pointer.worldY);
+
+    // Criar o projétil
+    const bullet = this.add.circle(player.x, player.y, 5, 0xffff00);
     this.physics.add.existing(bullet);
 
-    // Set bullet velocity
-    const speed = 500;
-    bullet.body.setVelocity(Math.cos(angle) * speed, Math.sin(angle) * speed);
+    // Aplicar velocidade baseada na rotação (Correção Gemini)
+    this.physics.velocityFromRotation(angle, gameState.bulletSpeed, bullet.body.velocity);
 
-    // Auto destroy
+    // Destruição automática para evitar memory leak
     this.time.addEvent({
         delay: 2000,
-        callback: () => bullet.destroy(),
+        callback: () => {
+            if (bullet) bullet.destroy();
+        }
     });
+
     bullets.add(bullet);
 }
 
-function hitZombie(bullet, zombie) {
+function damageZombie(bullet, zombie) {
     bullet.destroy();
     zombie.hp -= gameState.bulletDamage;
 
@@ -357,6 +363,7 @@ function setupShopListeners() {
             gameState.gold -= cost;
             gameState.upgrades.damage++;
             gameState.bulletDamage += 1;
+            gameState.bulletSpeed += 50; // Extra speed!
             ui.lvls.damage.innerText = 'LVL ' + gameState.upgrades.damage;
             ui.costs.damage.innerText = 150 * gameState.upgrades.damage;
             updateUI();

@@ -107,70 +107,38 @@ canvas {
   box-shadow: 0 0 10px rgba(255, 0, 85, 0.5);
 }
 
-/* Shop Menu / Upgrade Menu */
-.shop-menu,
-#upgrade-menu {
+/* Shop Menu */
+.shop-menu {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%) scale(0.9);
-  width: 450px;
-  height: 85%;
-  background: rgba(10, 10, 15, 0.95);
-  backdrop-filter: blur(25px);
-  border: 2px solid var(--accent);
+  width: 400px;
+  background: rgba(10, 10, 12, 0.95);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--primary);
   border-radius: 20px;
-  padding: 25px;
-  pointer-events: all;
+  padding: 30px;
+  pointer-events: auto;
   opacity: 0;
   visibility: hidden;
-  transition: all 0.3s ease-out;
-  z-index: 1000;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 0 50px rgba(0, 0, 0, 0.8), 0 0 20px rgba(51, 170, 255, 0.2);
+  transition: all 0.4s ease;
+  z-index: 20;
 }
 
-.shop-menu.active,
-#upgrade-menu.active {
+.shop-menu.active {
   opacity: 1;
   visibility: visible;
   transform: translate(-50%, -50%) scale(1);
 }
 
-#game-container.menu-open {
-  pointer-events: none;
-}
-
-.shop-content {
-  flex: 1;
-  overflow-y: auto;
-  padding-right: 10px;
-  margin-bottom: 15px;
-}
-
-/* Scrollbar styling */
-.shop-content::-webkit-scrollbar {
-  width: 6px;
-}
-
-.shop-content::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 10px;
-}
-
-.shop-content::-webkit-scrollbar-thumb {
-  background: var(--accent);
-  border-radius: 10px;
-}
-
 .shop-title {
   font-family: 'Orbitron', sans-serif;
   text-align: center;
-  margin-bottom: 20px;
-  color: var(--accent);
-  font-size: 1.6rem;
-  text-shadow: 0 0 15px rgba(51, 170, 255, 0.4);
+  margin-bottom: 25px;
+  color: var(--primary);
+  font-size: 1.8rem;
+  text-shadow: 0 0 15px rgba(0, 255, 136, 0.4);
 }
 
 .shop-item {

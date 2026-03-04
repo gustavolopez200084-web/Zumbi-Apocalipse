@@ -40,88 +40,48 @@
             <div id="base-hp-bar" class="health-bar-fill"></div>
           </div>
           <div class="label" id="wave-label" style="margin-top: 10px; font-size: 0.7rem;">ONDA: <span
-              id="wave-number">1</span> | TORRETAS: <span id="hud-turret-lvl">LV. 1</span></div>
+              id="wave-number">1</span></div>
         </div>
       </div>
     </div>
 
     <!-- Upgrade Shop (Hidden by default) -->
-    <div id="upgrade-menu" class="shop-menu">
-      <h2 class="shop-title">MERCADO DE DEFESA PRO</h2>
+    <div id="shop-menu" class="shop-menu">
+      <h2 class="shop-title">UPGRADES</h2>
 
-      <div class="shop-content">
-        <div id="upgrade-fire-rate" class="shop-item" aria-label="Aumentar cadência de tiro">
-          <div class="upgrade-info">
-            <span class="upgrade-name">Cadência Heroica</span>
-            <span class="upgrade-cost">Custo: <span id="cost-fire-rate">100</span></span>
-          </div>
-          <div class="label" id="lvl-fire-rate">LVL 1</div>
+      <div id="upgrade-fire-rate" class="shop-item" aria-label="Aumentar cadência de tiro">
+        <div class="upgrade-info">
+          <span class="upgrade-name">Cadência de Tiro</span>
+          <span class="upgrade-cost">Custo: <span id="cost-fire-rate">100</span></span>
         </div>
-
-        <div id="upgrade-damage" class="shop-item" aria-label="Aumentar dano">
-          <div class="upgrade-info">
-            <span class="upgrade-name">Dano Concentrado</span>
-            <span class="upgrade-cost">Custo: <span id="cost-damage">150</span></span>
-          </div>
-          <div class="label" id="lvl-damage">LVL 1</div>
-        </div>
-
-        <div id="repair-base" class="shop-item" aria-label="Reparar base">
-          <div class="upgrade-info">
-            <span class="upgrade-name">Nano-Reparo (+25% Base)</span>
-            <span class="upgrade-cost">Custo: <span id="cost-repair">150</span></span>
-          </div>
-          <div class="label">FIX</div>
-        </div>
-
-        <div id="fortify-base" class="shop-item" aria-label="Fortalecer base">
-          <div class="upgrade-info">
-            <span class="upgrade-name">Blindagem Robusta (+HP)</span>
-            <span class="upgrade-cost">Custo: <span id="cost-fortify">300</span></span>
-          </div>
-          <div class="label" id="lvl-fortify">LVL 1</div>
-        </div>
-
-        <div id="buy-turret" class="shop-item" aria-label="Comprar Torreta">
-          <div class="upgrade-info">
-            <span class="upgrade-name">Sistema Sentinela</span>
-            <span class="upgrade-cost">Custo: <span id="cost-turret">1500</span></span>
-          </div>
-          <div class="label" id="turret-count">0/4</div>
-        </div>
-
-        <!-- Turret Upgrades (Hidden until first turret bought) -->
-        <div id="turret-upgrades-section"
-          style="display: none; border-top: 1px solid var(--glass-border); padding-top: 15px; margin-top: 10px;">
-          <h3 class="label" style="text-align: center; margin-bottom: 10px; color: #fff;">UPGRADES DE SENTINELA</h3>
-
-          <div id="upgrade-turret-fire" class="shop-item" aria-label="Melhorar Canos">
-            <div class="upgrade-info">
-              <span class="upgrade-name">Canos Supersônicos</span>
-              <span class="upgrade-cost">Custo: <span id="cost-turret-fire">800</span></span>
-            </div>
-            <div class="label" id="lvl-turret-fire">LVL 1</div>
-          </div>
-
-          <div id="upgrade-turret-dmg" class="shop-item" aria-label="Munição Perfurante">
-            <div class="upgrade-info">
-              <span class="upgrade-name">Núcleos de Urânio (Dano)</span>
-              <span class="upgrade-cost">Custo: <span id="cost-turret-dmg">1200</span></span>
-            </div>
-            <div class="label" id="lvl-turret-dmg">LVL 1</div>
-          </div>
-
-          <div id="upgrade-turret-range" class="shop-item" aria-label="Sensores Avançados">
-            <div class="upgrade-info">
-              <span class="upgrade-name">Escaneamento LiDAR (Alcance)</span>
-              <span class="upgrade-cost">Custo: <span id="cost-turret-range">600</span></span>
-            </div>
-            <div class="label" id="lvl-turret-range">LVL 1</div>
-          </div>
-        </div>
+        <div class="label" id="lvl-fire-rate">LVL 1</div>
       </div>
 
-      <button id="btn-close-shop" class="btn-close">FECHAR (P)</button>
+      <div id="upgrade-damage" class="shop-item" aria-label="Aumentar dano">
+        <div class="upgrade-info">
+          <span class="upgrade-name">Dano</span>
+          <span class="upgrade-cost">Custo: <span id="cost-damage">150</span></span>
+        </div>
+        <div class="label" id="lvl-damage">LVL 1</div>
+      </div>
+
+      <div id="repair-base" class="shop-item" aria-label="Reparar base">
+        <div class="upgrade-info">
+          <span class="upgrade-name">Reparar Base (+25%)</span>
+          <span class="upgrade-cost">Custo: <span id="cost-repair">150</span></span>
+        </div>
+        <div class="label">REPARO</div>
+      </div>
+
+      <div id="fortify-base" class="shop-item" aria-label="Fortalecer base">
+        <div class="upgrade-info">
+          <span class="upgrade-name">Fortalecer Base (+HP Máx)</span>
+          <span class="upgrade-cost">Custo: <span id="cost-fortify">300</span></span>
+        </div>
+        <div class="label" id="lvl-fortify">LVL 1</div>
+      </div>
+
+      <button id="btn-close-shop" class="btn-close">VOLTAR AO JOGO (P)</button>
     </div>
   </div>
 

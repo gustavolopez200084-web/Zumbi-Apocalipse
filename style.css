@@ -107,26 +107,39 @@ canvas {
   box-shadow: 0 0 10px rgba(255, 0, 85, 0.5);
 }
 
-/* Shop Menu */
-.shop-menu {
+/* Shop Menu / Upgrade Menu */
+.shop-menu,
+#upgrade-menu {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%) scale(0.9);
   width: 450px;
   height: 85%;
-  background: rgba(10, 10, 15, 0.9);
+  background: rgba(10, 10, 15, 0.95);
   backdrop-filter: blur(25px);
-  border: 1px solid var(--accent);
+  border: 2px solid var(--accent);
   border-radius: 20px;
   padding: 25px;
-  pointer-events: auto;
+  pointer-events: all;
   opacity: 0;
   visibility: hidden;
-  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  z-index: 100;
+  transition: all 0.3s ease-out;
+  z-index: 1000;
   display: flex;
   flex-direction: column;
+  box-shadow: 0 0 50px rgba(0, 0, 0, 0.8), 0 0 20px rgba(51, 170, 255, 0.2);
+}
+
+.shop-menu.active,
+#upgrade-menu.active {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+#game-container.menu-open {
+  pointer-events: none;
 }
 
 .shop-content {

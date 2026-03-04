@@ -38,7 +38,7 @@ const gameState = {
     baseBulletDamage: 50,
     bulletSpeed: 600,
     lastFired: 0,
-    isPaused: false,
+    isStoreOpen: false,
     zombieSpeed: 60,
     zombieMaxHP: 100,
     spawnRate: 2000,
@@ -67,7 +67,8 @@ const ui = {
     baseHpBar: document.getElementById('base-hp-bar'),
     wave: document.getElementById('wave-number'),
     turretLvl: document.getElementById('hud-turret-lvl'),
-    shop: document.getElementById('shop-menu'),
+    shop: document.getElementById('upgrade-menu'),
+    container: document.getElementById('game-container'),
     costs: {
         fireRate: document.getElementById('cost-fire-rate'),
         damage: document.getElementById('cost-damage'),
@@ -229,7 +230,7 @@ function create() {
     });
 
     // Set higher speed for turret bullets for "perfect aim"
-    gameState.turretBulletSpeed = 2000;
+    gameState.turretBulletSpeed = 1000;
 
     zombies = this.physics.add.group();
     turrets = this.add.group();
@@ -270,7 +271,7 @@ function create() {
 
     // 9. Input for Turret Placement
     this.input.on('pointerdown', (pointer) => {
-        if (gameState.isPaused) return; // Block input when paused
+        if (gameState.isStoreOpen) return; // Block input when shop is open
         if (gameState.isPlacingTurret) {
             placeTurret.call(this, pointer.x, pointer.y);
         }
@@ -284,7 +285,10 @@ function create() {
 }
 
 function update(time, delta) {
-    // Clear and redraw HP bars - DO THIS BEFORE EARLY RETURN so they stay visible when paused
+    if (gameState.isStoreOpen) return;
+
+    // Clear and redraw HP bars - DO THIS BEFORE EARLY RETURN if we wanted them during pause, 
+    // but the user wants early return at the top.
     this.hpGraphics.clear();
     zombies.children.iterate((zombie) => {
         if (zombie && zombie.active && zombie.hp < zombie.maxHp) {
@@ -304,14 +308,8 @@ function update(time, delta) {
         }
     });
 
-    // 1. Player Rotation (also before return to keep it smooth during pause if desired, 
-    // but the user asked for return at the BEGINNING)
-    if (gameState.isPaused) return;
-
-    // Player Rotation: Entire Container faces the mouse
-    const pointer = this.input.activePointer;
-    const playerAngle = Phaser.Math.Angle.Between(player.x, player.y, pointer.worldX, pointer.worldY);
-    player.setRotation(playerAngle);
+    // Player Rotation: Entire Container faces the mouse (Fix requested)
+    player.rotation = Phaser.Math.Angle.Between(player.x, player.y, this.input.activePointer.worldX, this.input.activePointer.worldY);
 
     // Player Movement (WASD remains independent of rotation)
     player.body.setVelocity(0);
@@ -357,7 +355,7 @@ function update(time, delta) {
 // --- Game Functions ---
 
 function spawnZombie() {
-    if (gameState.isPaused) return;
+    if (gameState.isStoreOpen) return;
 
     // Pick a side (Top, Bottom, Left, Right)
     const side = Phaser.Math.Between(0, 3);
@@ -635,16 +633,18 @@ function gameOver() {
 // --- Shop Logic ---
 
 function toggleShop() {
-    gameState.isPaused = !gameState.isPaused;
+    gameState.isStoreOpen = !gameState.isStoreOpen;
     const scene = game.scene.scenes[0];
 
-    if (gameState.isPaused) {
+    if (gameState.isStoreOpen) {
         ui.shop.style.display = 'block';
-        ui.shop.classList.add('active'); // Keep class for possible transitions
+        ui.shop.classList.add('active');
+        ui.container.classList.add('menu-open');
         scene.physics.world.pause();
     } else {
         ui.shop.style.display = 'none';
         ui.shop.classList.remove('active');
+        ui.container.classList.remove('menu-open');
         scene.physics.world.resume();
     }
 }

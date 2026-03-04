@@ -158,11 +158,9 @@ function create() {
     cursors = this.input.keyboard.createCursorKeys();
     keys = this.input.keyboard.addKeys('W,A,S,D,P');
 
-    // Emergency Fix: Global Keyboard Listener
-    window.addEventListener('keydown', (event) => {
-        if (event.key.toLowerCase() === 'p') {
-            this.toggleUpgradeMenu();
-        }
+    // 5.1 Phaser-native 'P' key listener (reliable and context-safe)
+    this.input.keyboard.on('keydown-P', () => {
+        toggleUpgradeMenu(this);
     });
 
     // 6. Collisions
@@ -221,25 +219,23 @@ function update(time, delta) {
     turrets.children.iterate((t) => { if (t) t.updateTurret(time); });
 }
 
-function toggleUpgradeMenu() {
+function toggleUpgradeMenu(scene) {
     gameState.isStoreOpen = !gameState.isStoreOpen;
     if (gameState.isStoreOpen) {
         shopContainer.setVisible(true);
-        this.physics.world.pause();
+        scene.physics.world.pause();
     } else {
         shopContainer.setVisible(false);
-        this.physics.world.resume();
+        scene.physics.world.resume();
     }
 }
-// Alias for internal calls if needed
-this.toggleUpgradeMenu = toggleUpgradeMenu;
 
 function createShop() {
     shopContainer = this.add.container(400, 300).setDepth(200).setVisible(false);
     const bg = this.add.rectangle(0, 0, 400, 500, 0x000000, 0.8).setStrokeStyle(2, 0x00ff88);
     const title = this.add.text(0, -220, 'UPGRADES', { fontSize: '24px', color: '#00ff88' }).setOrigin(0.5);
     const closeBtn = this.add.text(0, 220, '[ FECHAR ]', { fontSize: '20px', color: '#fff' }).setOrigin(0.5).setInteractive();
-    closeBtn.on('pointerdown', () => this.toggleUpgradeMenu());
+    closeBtn.on('pointerdown', () => toggleUpgradeMenu(this));
 
     shopItems = this.add.container(0, 0);
     const mask = this.add.graphics().fillRect(200, 100, 400, 350).setVisible(false).createGeometryMask();

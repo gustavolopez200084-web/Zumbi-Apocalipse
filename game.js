@@ -42,10 +42,20 @@ const gameState = {
     zombieSpeed: 60,
     zombieMaxHP: 100,
     spawnRate: 2000,
+    initialSpawnRate: 2000,
+    turretsCount: 0,
+    maxTurrets: 4,
+    isPlacingTurret: false,
+    turretFireRate: 800,
+    turretRange: 250,
+    turretBulletDamage: 50,
     upgrades: {
         fireRate: 1,
-        damage: 0, // Inicia em 0
-        fortify: 1
+        damage: 0,
+        fortify: 1,
+        turretFire: 1,
+        turretDmg: 1,
+        turretRange: 1
     }
 };
 
@@ -56,22 +66,104 @@ const ui = {
     playerHpBar: document.getElementById('player-hp-bar'),
     baseHpBar: document.getElementById('base-hp-bar'),
     wave: document.getElementById('wave-number'),
+    turretLvl: document.getElementById('hud-turret-lvl'),
     shop: document.getElementById('shop-menu'),
     costs: {
         fireRate: document.getElementById('cost-fire-rate'),
         damage: document.getElementById('cost-damage'),
         repair: document.getElementById('cost-repair'),
-        fortify: document.getElementById('cost-fortify')
+        fortify: document.getElementById('cost-fortify'),
+        turret: document.getElementById('cost-turret'),
+        turretFire: document.getElementById('cost-turret-fire'),
+        turretDmg: document.getElementById('cost-turret-dmg'),
+        turretRange: document.getElementById('cost-turret-range')
     },
     lvls: {
         fireRate: document.getElementById('lvl-fire-rate'),
         damage: document.getElementById('lvl-damage'),
-        fortify: document.getElementById('lvl-fortify')
+        fortify: document.getElementById('lvl-fortify'),
+        turretCount: document.getElementById('turret-count'),
+        turretFire: document.getElementById('lvl-turret-fire'),
+        turretDmg: document.getElementById('lvl-turret-dmg'),
+        turretRange: document.getElementById('lvl-turret-range')
     }
 };
 
 const game = new Phaser.Game(config);
-let player, base, zombies, bullets, cursors, keys, lastWaveTime;
+let player, base, zombies, bullets, turretBullets, turrets, cursors, keys, lastWaveTime;
+
+class Turret extends Phaser.GameObjects.Container {
+    constructor(scene, x, y) {
+        super(scene, x, y);
+        this.scene = scene;
+        this.lastFired = 0;
+
+        // Visual parts
+        const basePart = scene.add.circle(0, 0, 16, 0xbdc3c7);
+        basePart.setStrokeStyle(2, 0x2c3e50);
+
+        this.barrel = scene.add.rectangle(0, 0, 20, 8, 0x34495e);
+        this.barrel.setOrigin(0, 0.5); // Rotate around left edge
+
+        this.add([basePart, this.barrel]);
+        scene.add.existing(this);
+
+        // Detection range visual (semi-transparent circle)
+        this.rangeCircle = scene.add.circle(0, 0, gameState.turretRange, 0xffffff, 0.05);
+        this.add(this.rangeCircle);
+        this.sendToBack(this.rangeCircle);
+    }
+
+    updateTurret(time) {
+        if (time < this.lastFired + gameState.turretFireRate) return;
+
+        let closest = null;
+        let minDist = gameState.turretRange;
+
+        zombies.children.iterate((zombie) => {
+            if (zombie && zombie.active) {
+                const dist = Phaser.Math.Distance.Between(this.x, this.y, zombie.x, zombie.y);
+                if (dist < minDist) {
+                    minDist = dist;
+                    closest = zombie;
+                }
+            }
+        });
+
+        if (closest) {
+            const angle = Phaser.Math.Angle.Between(this.x, this.y, closest.x, closest.y);
+            this.barrel.setRotation(angle);
+
+            this.fireBullet(angle);
+            this.lastFired = time;
+        }
+
+        // Keep range circle aligned with global range
+        if (this.rangeCircle.radius !== gameState.turretRange) {
+            this.rangeCircle.setRadius(gameState.turretRange);
+        }
+    }
+
+    fireBullet(angle) {
+        let bullet = turretBullets.get(this.x, this.y, 'bullet_tex');
+        if (bullet) {
+            bullet.setActive(true);
+            bullet.setVisible(true);
+            bullet.setPosition(this.x, this.y);
+            this.scene.physics.add.existing(bullet);
+
+            bullet.body.setVelocity(
+                Math.cos(angle) * gameState.bulletSpeed,
+                Math.sin(angle) * gameState.bulletSpeed
+            );
+
+            this.scene.time.addEvent({
+                delay: 2000,
+                callback: () => { if (bullet.active) bullet.destroy(); }
+            });
+        }
+    }
+}
 
 function preload() {
     // No external assets required as per instructions
@@ -112,7 +204,13 @@ function create() {
         maxSize: 100
     });
 
+    turretBullets = this.physics.add.group({
+        defaultKey: 'bullet_tex',
+        maxSize: 100
+    });
+
     zombies = this.physics.add.group();
+    turrets = this.add.group();
 
     // 5. Input
     cursors = this.input.keyboard.createCursorKeys();
@@ -121,6 +219,7 @@ function create() {
     // 6. Collisions
     this.physics.add.collider(player, base);
     this.physics.add.overlap(bullets, zombies, damageZombie, null, this);
+    this.physics.add.overlap(turretBullets, zombies, damageZombie, null, this);
     // Overlap checks for damage logic
     this.physics.add.overlap(zombies, base, zombieDamageBase, null, this);
     this.physics.add.overlap(zombies, player, zombieDamagePlayer, null, this);
@@ -136,13 +235,20 @@ function create() {
 
     // 8. Zombie Spawn Loop
     this.spawnTimer = this.time.addEvent({
-        delay: 2000,
+        delay: gameState.spawnRate,
         callback: spawnZombie,
         callbackScope: this,
         loop: true
     });
 
-    // 9. Zombie HP Bar Graphics
+    // 9. Input for Turret Placement
+    this.input.on('pointerdown', (pointer) => {
+        if (gameState.isPlacingTurret) {
+            placeTurret.call(this, pointer.x, pointer.y);
+        }
+    });
+
+    // 10. Zombie HP Bar Graphics
     this.hpGraphics = this.add.graphics();
 
     // UI Setup
@@ -201,11 +307,25 @@ function update(time, delta) {
         if (!zombie || !zombie.active) return;
         const target = (Phaser.Math.Distance.Between(zombie.x, zombie.y, player.x, player.y) < 150) ? player : base;
         this.physics.moveToObject(zombie, target, gameState.zombieSpeed);
+
+        // Face rotation towards target
+        const angle = Phaser.Math.Angle.Between(zombie.x, zombie.y, target.x, target.y);
+        zombie.setRotation(angle);
     });
 
     // Pause Check
     if (Phaser.Input.Keyboard.JustDown(keys.P)) {
         toggleShop();
+    }
+
+    // Turret Logic
+    turrets.children.iterate((turret) => {
+        if (turret) turret.updateTurret(time);
+    });
+
+    // Visual helper for turret placement
+    if (gameState.isPlacingTurret) {
+        // We could add a preview here but let's keep it simple
     }
 }
 
@@ -222,16 +342,43 @@ function spawnZombie() {
     else if (side === 2) { x = -50; y = Phaser.Math.Between(0, 600); }
     else { x = 850; y = Phaser.Math.Between(0, 600); }
 
+    // Use Container for Zombie Procedural Art
+    const zombie = this.add.container(x, y);
     const zombieSize = 12;
-    const zombie = this.add.circle(x, y, zombieSize, 0xff0055);
-    this.physics.add.existing(zombie);
 
-    // Nova lógica de vida: zombieHP = 100 * (1.2 ^ (currentWave - 1))
+    // 1. Body (Green)
+    const body = this.add.circle(0, 0, zombieSize, 0x27ae60);
+    body.setStrokeStyle(2, 0x2ecc71);
+
+    // 2. Eyes (Black)
+    const eyeR = this.add.circle(6, -4, 2, 0x000000);
+    const eyeL = this.add.circle(6, 4, 2, 0x000000);
+
+    // 3. Mouth (Black Line)
+    const mouth = this.add.rectangle(8, 0, 2, 6, 0x000000);
+
+    zombie.add([body, eyeR, eyeL, mouth]);
+
+    // Physics required for individual tracking
+    this.physics.add.existing(zombie);
+    zombie.body.setCircle(zombieSize, -zombieSize, -zombieSize);
+
+    // Animation: Pulsing Effect
+    this.tweens.add({
+        targets: zombie,
+        scale: { from: 0.95, to: 1.05 },
+        duration: 400,
+        yoyo: true,
+        loop: -1
+    });
+
     zombie.maxHp = Math.floor(100 * Math.pow(1.2, gameState.wave - 1));
     zombie.hp = zombie.maxHp;
+    zombie.lastDamageTime = 0;
 
-    zombie.lastDamageTime = 0; // For continuous damage tracking
-    zombie.setStrokeStyle(2, 0xffffff);
+    // Custom property to aid damage coloring
+    zombie.mainBody = body;
+
     zombies.add(zombie);
 }
 
@@ -270,18 +417,24 @@ function fireBullet() {
 }
 
 function damageZombie(bullet, zombie) {
+    if (!zombie.active) return;
     bullet.destroy();
 
-    // Sistema de Critical Hit: 10% chance
     const isCrit = Math.random() < 0.10;
+    // Distinguish player bullet damage from turret bullet damage if needed, 
+    // but here we use unified logic, choosing turretDamage if bullet came from turret bullets group.
     let damage = gameState.bulletDamage;
+    if (turretBullets.contains(bullet)) {
+        damage = gameState.turretBulletDamage;
+    }
+
     if (isCrit) {
         damage *= 2;
         showCritEffect(this, zombie.x, zombie.y);
     }
 
     zombie.hp -= damage;
-    flashRed(this, zombie);
+    flashRed(this, zombie.mainBody || zombie);
 
     if (zombie.hp <= 0) {
         gameState.gold += 20;
@@ -358,10 +511,34 @@ function zombieDamagePlayer(playerObj, zombie) {
 function scaleDifficulty() {
     gameState.wave++;
     gameState.zombieSpeed += 5;
-    // O HP dos zumbis agora é calculado dinamicamente no spawnZombie usando a Wave
-    gameState.spawnRate = Math.max(200, gameState.spawnRate - 100);
+
+    // Fórmula: novoDelay = Math.max(300, delayInicial - (onda * 100))
+    const initialDelay = gameState.initialSpawnRate;
+    const newDelay = Math.max(300, initialDelay - (gameState.wave * 100));
+
+    // Se a frequência aumentou, mostrar aviso
+    if (newDelay < gameState.spawnRate) {
+        showHordeAlert.call(this);
+    }
+
+    gameState.spawnRate = newDelay;
     this.spawnTimer.delay = gameState.spawnRate;
     updateUI();
+}
+
+function showHordeAlert() {
+    const text = this.add.text(400, 100, 'HORDA AUMENTANDO!', {
+        fontFamily: 'Orbitron', fontSize: '32px', fill: '#ffaa00', fontWeight: 'bold'
+    }).setOrigin(0.5);
+
+    this.tweens.add({
+        targets: text,
+        alpha: { from: 1, to: 0 },
+        scale: { from: 1, to: 1.5 },
+        duration: 2000,
+        ease: 'Linear',
+        onComplete: () => text.destroy()
+    });
 }
 
 function updateUI() {
@@ -369,11 +546,45 @@ function updateUI() {
     ui.dmg.innerText = gameState.bulletDamage;
     ui.wave.innerText = gameState.wave;
 
+    const turretLvlMax = Math.max(gameState.upgrades.turretFire, gameState.upgrades.turretDmg, gameState.upgrades.turretRange);
+    ui.turretLvl.innerText = 'LV. ' + turretLvlMax;
+
     const baseHpPercent = (gameState.baseHp / gameState.baseMaxHp) * 100;
     ui.baseHpBar.style.width = Math.max(0, baseHpPercent) + '%';
 
     const playerHpPercent = (gameState.playerHp / gameState.playerMaxHp) * 100;
     ui.playerHpBar.style.width = Math.max(0, playerHpPercent) + '%';
+
+    // Update Turret Shop Info
+    ui.lvls.turretCount.innerText = `${gameState.turretsCount}/${gameState.maxTurrets}`;
+
+    const buyTurretItem = document.getElementById('buy-turret');
+    const turretUpgradeSection = document.getElementById('turret-upgrades-section');
+
+    // Show turret upgrades ONLY if at least one turret is owned
+    if (gameState.turretsCount > 0) {
+        turretUpgradeSection.style.display = 'block';
+    } else {
+        turretUpgradeSection.style.display = 'none'; // Hide if no turrets
+    }
+
+    if (gameState.gold < 1500 || gameState.turretsCount >= gameState.maxTurrets) {
+        buyTurretItem.style.opacity = '0.5';
+        buyTurretItem.style.cursor = 'not-allowed';
+    } else {
+        buyTurretItem.style.opacity = '1';
+        buyTurretItem.style.cursor = 'pointer';
+    }
+
+    // Update Turret Upgrade Costs etc.
+    ui.lvls.turretFire.innerText = `LVL ${gameState.upgrades.turretFire}`;
+    ui.costs.turretFire.innerText = 800 * gameState.upgrades.turretFire;
+
+    ui.lvls.turretDmg.innerText = `LVL ${gameState.upgrades.turretDmg}`;
+    ui.costs.turretDmg.innerText = 1200 * gameState.upgrades.turretDmg;
+
+    ui.lvls.turretRange.innerText = `LVL ${gameState.upgrades.turretRange}`;
+    ui.costs.turretRange.innerText = 600 * gameState.upgrades.turretRange;
 
     // Visual alerts for base
     if (baseHpPercent < 30) ui.baseHpBar.style.background = '#ff0000';
@@ -459,4 +670,58 @@ function setupShopListeners() {
             updateUI();
         }
     };
+
+    document.getElementById('buy-turret').onclick = () => {
+        if (gameState.gold >= 1500 && gameState.turretsCount < gameState.maxTurrets && !gameState.isPlacingTurret) {
+            gameState.gold -= 1500;
+            gameState.isPlacingTurret = true;
+            toggleShop(); // Close shop to place
+            updateUI();
+
+            // Helpful instruction
+            const msg = game.scene.scenes[0].add.text(400, 550, 'Clique no mapa para posicionar a Torreta', {
+                fontFamily: 'Orbitron', fontSize: '18px', fill: '#ffffff'
+            }).setOrigin(0.5);
+            game.scene.scenes[0].time.addEvent({ delay: 3000, callback: () => msg.destroy() });
+        }
+    };
+
+    // Turret Upgrade Listeners
+    document.getElementById('upgrade-turret-fire').onclick = () => {
+        const cost = 800 * gameState.upgrades.turretFire;
+        if (gameState.gold >= cost) {
+            gameState.gold -= cost;
+            gameState.upgrades.turretFire++;
+            gameState.turretFireRate = Math.max(200, 800 - (gameState.upgrades.turretFire * 100));
+            updateUI();
+        }
+    };
+
+    document.getElementById('upgrade-turret-dmg').onclick = () => {
+        const cost = 1200 * gameState.upgrades.turretDmg;
+        if (gameState.gold >= cost) {
+            gameState.gold -= cost;
+            gameState.upgrades.turretDmg++;
+            gameState.turretBulletDamage += 25;
+            updateUI();
+        }
+    };
+
+    document.getElementById('upgrade-turret-range').onclick = () => {
+        const cost = 600 * gameState.upgrades.turretRange;
+        if (gameState.gold >= cost) {
+            gameState.gold -= cost;
+            gameState.upgrades.turretRange++;
+            gameState.turretRange += 50;
+            updateUI();
+        }
+    };
+}
+
+function placeTurret(x, y) {
+    const turret = new Turret(this, x, y);
+    turrets.add(turret);
+    gameState.turretsCount++;
+    gameState.isPlacingTurret = false;
+    updateUI();
 }

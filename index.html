@@ -40,7 +40,7 @@
             <div id="base-hp-bar" class="health-bar-fill"></div>
           </div>
           <div class="label" id="wave-label" style="margin-top: 10px; font-size: 0.7rem;">ONDA: <span
-              id="wave-number">1</span></div>
+              id="wave-number">1</span> | TORRETAS: <span id="hud-turret-lvl">LV. 1</span></div>
         </div>
       </div>
     </div>
@@ -79,6 +79,42 @@
           <span class="upgrade-cost">Custo: <span id="cost-fortify">300</span></span>
         </div>
         <div class="label" id="lvl-fortify">LVL 1</div>
+      </div>
+
+      <div id="buy-turret" class="shop-item" aria-label="Comprar Torreta">
+        <div class="upgrade-info">
+          <span class="upgrade-name">Comprar Torreta</span>
+          <span class="upgrade-cost">Custo: <span id="cost-turret">1500</span></span>
+        </div>
+        <div class="label" id="turret-count">0/4</div>
+      </div>
+
+      <!-- Turret Upgrades (Hidden until first turret bought) -->
+      <div id="turret-upgrades-section"
+        style="display: none; border-top: 1px solid var(--glass-border); padding-top: 15px; margin-top: 10px;">
+        <div id="upgrade-turret-fire" class="shop-item" aria-label="Melhorar Canos">
+          <div class="upgrade-info">
+            <span class="upgrade-name">Melhorar Canos (Cadência)</span>
+            <span class="upgrade-cost">Custo: <span id="cost-turret-fire">800</span></span>
+          </div>
+          <div class="label" id="lvl-turret-fire">LVL 1</div>
+        </div>
+
+        <div id="upgrade-turret-dmg" class="shop-item" aria-label="Munição Perfurante">
+          <div class="upgrade-info">
+            <span class="upgrade-name">Munição Perfurante (Dano)</span>
+            <span class="upgrade-cost">Custo: <span id="cost-turret-dmg">1200</span></span>
+          </div>
+          <div class="label" id="lvl-turret-dmg">LVL 1</div>
+        </div>
+
+        <div id="upgrade-turret-range" class="shop-item" aria-label="Sensores Avançados">
+          <div class="upgrade-info">
+            <span class="upgrade-name">Sensores Avançados (Alcance)</span>
+            <span class="upgrade-cost">Custo: <span id="cost-turret-range">600</span></span>
+          </div>
+          <div class="label" id="lvl-turret-range">LVL 1</div>
+        </div>
       </div>
 
       <button id="btn-close-shop" class="btn-close">VOLTAR AO JOGO (P)</button>

@@ -153,8 +153,8 @@ class Turret extends Phaser.GameObjects.Container {
             this.scene.physics.add.existing(bullet);
 
             bullet.body.setVelocity(
-                Math.cos(angle) * gameState.bulletSpeed,
-                Math.sin(angle) * gameState.bulletSpeed
+                Math.cos(angle) * gameState.turretBulletSpeed,
+                Math.sin(angle) * gameState.turretBulletSpeed
             );
 
             this.scene.time.addEvent({
@@ -170,27 +170,45 @@ function preload() {
 }
 
 function create() {
-    // 1. Background (Grid effect for depth)
-    const graphics = this.add.graphics();
-    graphics.lineStyle(1, 0x1a1a1a);
-    for (let i = 0; i < 800; i += 40) {
-        graphics.moveTo(i, 0);
-        graphics.lineTo(i, 600);
+    // 1. Procedural Grass Background
+    const grassGraphics = this.make.graphics({ x: 0, y: 0, add: false });
+    // Light green base
+    grassGraphics.fillStyle(0x2d5a27);
+    grassGraphics.fillRect(0, 0, 64, 64);
+    // Darker dots/tufts
+    grassGraphics.fillStyle(0x1e3c1a);
+    for (let i = 0; i < 8; i++) {
+        let gx = Phaser.Math.Between(0, 64);
+        let gy = Phaser.Math.Between(0, 64);
+        grassGraphics.fillPoint(gx, gy, 2);
     }
-    for (let j = 0; j < 600; j += 40) {
-        graphics.moveTo(0, j);
-        graphics.lineTo(800, j);
-    }
-    graphics.strokePath();
+    grassGraphics.generateTexture('grass_tex', 64, 64);
+    this.add.tileSprite(400, 300, 800, 600, 'grass_tex');
 
     // 2. Base (Central Core)
     base = this.add.rectangle(400, 300, 60, 60, 0x33aaff);
     this.physics.add.existing(base, true); // Static body
     base.setStrokeStyle(4, 0x00ff88);
 
-    // 3. Player (Hero)
-    player = this.add.circle(400, 400, 15, 0x00ff88);
+    // 3. Player Pro Visual (Container)
+    player = this.add.container(400, 400);
+
+    const backpack = this.add.rectangle(-10, 0, 12, 18, 0x1b4f72);
+    const body = this.add.circle(0, 0, 15, 0x3498db);
+    body.setStrokeStyle(2, 0x21618c);
+
+    // Tech Visor
+    const visor = this.add.rectangle(6, 0, 10, 20, 0x00ffff, 0.6);
+    visor.setStrokeStyle(1, 0xffffff);
+
+    // Player Barrel
+    player.barrel = this.add.rectangle(12, 0, 20, 6, 0x2c3e50);
+    player.barrel.setOrigin(0, 0.5);
+
+    player.add([backpack, body, visor, player.barrel]);
+
     this.physics.add.existing(player);
+    player.body.setCircle(15, -15, -15);
     player.body.setCollideWorldBounds(true);
 
     // 4. Create proper textures for objects without external assets
@@ -208,6 +226,9 @@ function create() {
         defaultKey: 'bullet_tex',
         maxSize: 100
     });
+
+    // Set higher speed for turret bullets for "perfect aim"
+    gameState.turretBulletSpeed = 2000;
 
     zombies = this.physics.add.group();
     turrets = this.add.group();
@@ -278,6 +299,11 @@ function update(time, delta) {
         }
     });
 
+    // Player Rotation/Weapon Orientation
+    const pointer = this.input.activePointer;
+    const playerAngle = Phaser.Math.Angle.Between(player.x, player.y, pointer.worldX, pointer.worldY);
+    player.barrel.setRotation(playerAngle);
+
     // Player Movement
     player.body.setVelocity(0);
     let vx = 0;
@@ -322,11 +348,6 @@ function update(time, delta) {
     turrets.children.iterate((turret) => {
         if (turret) turret.updateTurret(time);
     });
-
-    // Visual helper for turret placement
-    if (gameState.isPlacingTurret) {
-        // We could add a preview here but let's keep it simple
-    }
 }
 
 // --- Game Functions ---
@@ -611,12 +632,16 @@ function gameOver() {
 
 function toggleShop() {
     gameState.isPaused = !gameState.isPaused;
+    const scene = game.scene.scenes[0];
+
     if (gameState.isPaused) {
         ui.shop.classList.add('active');
-        game.scene.scenes[0].physics.pause();
+        scene.physics.pause();
+        scene.scene.pause(); // Pause animations and updates
     } else {
         ui.shop.classList.remove('active');
-        game.scene.scenes[0].physics.resume();
+        scene.scene.resume(); // Resume everything
+        scene.physics.resume();
     }
 }
 

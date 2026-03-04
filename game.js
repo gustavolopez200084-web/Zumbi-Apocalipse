@@ -264,6 +264,7 @@ function create() {
 
     // 9. Input for Turret Placement
     this.input.on('pointerdown', (pointer) => {
+        if (gameState.isPaused) return; // Block input when paused
         if (gameState.isPlacingTurret) {
             placeTurret.call(this, pointer.x, pointer.y);
         }
@@ -299,12 +300,12 @@ function update(time, delta) {
         }
     });
 
-    // Player Rotation/Weapon Orientation
+    // Player Rotation: Entire Container faces the mouse
     const pointer = this.input.activePointer;
     const playerAngle = Phaser.Math.Angle.Between(player.x, player.y, pointer.worldX, pointer.worldY);
-    player.barrel.setRotation(playerAngle);
+    player.setRotation(playerAngle);
 
-    // Player Movement
+    // Player Movement (WASD remains independent of rotation)
     player.body.setVelocity(0);
     let vx = 0;
     let vy = 0;
@@ -323,7 +324,7 @@ function update(time, delta) {
     player.body.setVelocity(vx, vy);
 
     // Shooting
-    if (this.input.activePointer.isDown && time > gameState.lastFired) {
+    if (!gameState.isPaused && this.input.activePointer.isDown && time > gameState.lastFired) {
         fireBullet.call(this);
         gameState.lastFired = time + gameState.fireRate;
     }
@@ -339,7 +340,7 @@ function update(time, delta) {
         zombie.setRotation(angle);
     });
 
-    // Pause Check
+    // Pause Check (Using JustDown to avoid loop)
     if (Phaser.Input.Keyboard.JustDown(keys.P)) {
         toggleShop();
     }
@@ -637,10 +638,9 @@ function toggleShop() {
     if (gameState.isPaused) {
         ui.shop.classList.add('active');
         scene.physics.pause();
-        scene.scene.pause(); // Pause animations and updates
+        // NOT using scene.pause() to keep keyboard input alive
     } else {
         ui.shop.classList.remove('active');
-        scene.scene.resume(); // Resume everything
         scene.physics.resume();
     }
 }

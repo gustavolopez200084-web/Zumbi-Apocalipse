@@ -210,6 +210,7 @@ function create() {
     this.physics.add.existing(player);
     player.body.setCircle(15, -15, -15);
     player.body.setCollideWorldBounds(true);
+    player.setDepth(10); // Ensure player is above zombies and grass
 
     // 4. Create proper textures for objects without external assets
     const bulletGraphics = this.make.graphics({ x: 0, y: 0, add: false });
@@ -236,6 +237,11 @@ function create() {
     // 5. Input
     cursors = this.input.keyboard.createCursorKeys();
     keys = this.input.keyboard.addKeys('W,A,S,D,P');
+
+    // 5.1 Keyboard listener for Pause (P) - Fixes "freeze" bug
+    this.input.keyboard.on('keydown-P', () => {
+        toggleShop();
+    });
 
     // 6. Collisions
     this.physics.add.collider(player, base);
@@ -278,9 +284,7 @@ function create() {
 }
 
 function update(time, delta) {
-    if (gameState.isPaused) return;
-
-    // Clear and redraw HP bars
+    // Clear and redraw HP bars - DO THIS BEFORE EARLY RETURN so they stay visible when paused
     this.hpGraphics.clear();
     zombies.children.iterate((zombie) => {
         if (zombie && zombie.active && zombie.hp < zombie.maxHp) {
@@ -299,6 +303,10 @@ function update(time, delta) {
             this.hpGraphics.fillRect(px, py, barWidth * percent, barHeight);
         }
     });
+
+    // 1. Player Rotation (also before return to keep it smooth during pause if desired, 
+    // but the user asked for return at the BEGINNING)
+    if (gameState.isPaused) return;
 
     // Player Rotation: Entire Container faces the mouse
     const pointer = this.input.activePointer;
@@ -324,7 +332,7 @@ function update(time, delta) {
     player.body.setVelocity(vx, vy);
 
     // Shooting
-    if (!gameState.isPaused && this.input.activePointer.isDown && time > gameState.lastFired) {
+    if (this.input.activePointer.isDown && time > gameState.lastFired) {
         fireBullet.call(this);
         gameState.lastFired = time + gameState.fireRate;
     }
@@ -339,11 +347,6 @@ function update(time, delta) {
         const angle = Phaser.Math.Angle.Between(zombie.x, zombie.y, target.x, target.y);
         zombie.setRotation(angle);
     });
-
-    // Pause Check (Using JustDown to avoid loop)
-    if (Phaser.Input.Keyboard.JustDown(keys.P)) {
-        toggleShop();
-    }
 
     // Turret Logic
     turrets.children.iterate((turret) => {
@@ -636,12 +639,13 @@ function toggleShop() {
     const scene = game.scene.scenes[0];
 
     if (gameState.isPaused) {
-        ui.shop.classList.add('active');
-        scene.physics.pause();
-        // NOT using scene.pause() to keep keyboard input alive
+        ui.shop.style.display = 'block';
+        ui.shop.classList.add('active'); // Keep class for possible transitions
+        scene.physics.world.pause();
     } else {
+        ui.shop.style.display = 'none';
         ui.shop.classList.remove('active');
-        scene.physics.resume();
+        scene.physics.world.resume();
     }
 }
 
